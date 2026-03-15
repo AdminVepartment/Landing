@@ -442,6 +442,8 @@ export default function LandingPage() {
               <Link href="/whitepaper" className="text-sm text-foreground-dim hover:text-foreground transition-colors">Whitepaper</Link>
               <Link href="/onboarding/user-guide" className="text-sm text-foreground-dim hover:text-foreground transition-colors">Docs</Link>
               <Link href="/dashboard" className="text-sm text-foreground-dim hover:text-foreground transition-colors">Dashboard</Link>
+              <Link href="/privacy" className="text-sm text-foreground-dim hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/terms" className="text-sm text-foreground-dim hover:text-foreground transition-colors">Terms</Link>
               <Link href="/auth/signin" className="text-sm text-foreground-dim hover:text-foreground transition-colors">Sign in</Link>
             </div>
           </div>

@@ -23,6 +23,10 @@ import {
   Leaf,
   FileText,
   Download,
+  Twitter,
+  Instagram,
+  Linkedin,
+  Mail,
 } from "lucide-react";
 
 // ── Scroll-reveal hook ────────────────────────────────────────────────────────
@@ -444,9 +448,22 @@ export default function LandingPage() {
 
           <div className="h-px bg-border my-8" />
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <a href="https://x.com/vepartment" target="_blank" rel="noopener noreferrer" className="w-8 h-8 border border-border flex items-center justify-center text-foreground-dim hover:text-foreground hover:border-foreground-dim transition-colors">
+                <Twitter size={14} />
+              </a>
+              <a href="https://www.instagram.com/vepartment/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 border border-border flex items-center justify-center text-foreground-dim hover:text-foreground hover:border-foreground-dim transition-colors">
+                <Instagram size={14} />
+              </a>
+              <a href="https://www.linkedin.com/company/vepartment/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 border border-border flex items-center justify-center text-foreground-dim hover:text-foreground hover:border-foreground-dim transition-colors">
+                <Linkedin size={14} />
+              </a>
+              <a href="mailto:info@vepartment.com" className="w-8 h-8 border border-border flex items-center justify-center text-foreground-dim hover:text-foreground hover:border-foreground-dim transition-colors">
+                <Mail size={14} />
+              </a>
+            </div>
             <p className="text-xs font-mono text-foreground-dim">Vepartment v1.0.0</p>
-            <p className="text-xs font-mono text-foreground-dim">AI-native operating system for modular virtual departments</p>
           </div>
         </div>
       </footer>

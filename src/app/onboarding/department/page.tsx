@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { IconArrowRight, IconLoader, IconAlertCircle } from "@/components/icons";
 import {
   IconMarketing,
@@ -15,8 +16,7 @@ import {
 } from "@/components/icons";
 import type { SVGProps } from "react";
 import { cn } from "@/lib/utils";
-import { DepartmentGuide } from "./guide";
-import { useActivity } from "@/lib/activity-store";
+import { createClient } from "@/lib/supabase/client";
 
 function LogoMark() {
   return (
@@ -57,7 +57,7 @@ const TOTAL_STEPS = 6;
 const CURRENT_STEP = 5;
 
 export default function DepartmentCreationPage() {
-  const { log } = useActivity();
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<{
@@ -105,17 +105,49 @@ export default function DepartmentCreationPage() {
     }
   }
 
-  function handleContinue(e: React.MouseEvent) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleContinue(e: React.MouseEvent) {
+    e.preventDefault();
     if (!selected) {
-      e.preventDefault();
       setError("Please select a department before continuing.");
-    } else {
-      log({
-        icon: "department",
-        title: `${selected} department activated`,
-        dept: selected,
-        context: "First vepartment created",
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/auth/signin"); return; }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("workspace_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.workspace_id) { router.push("/onboarding/workspace"); return; }
+
+      const DEPT_COLORS: Record<string, string> = {
+        Marketing: "#4F46E5", Branding: "#EA580C", Product: "#0284C7",
+        Sales: "#059669", Sustainability: "#0D9488", Operations: "#52525B",
+        Finance: "#B45309", "HR / Talent": "#A21CAF",
+      };
+
+      const slug = selected.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+      await supabase.from("departments").insert({
+        workspace_id: profile.workspace_id,
+        name: selected,
+        slug,
+        color: DEPT_COLORS[selected] || "#52525B",
+        status: "active",
       });
+
+      router.push("/onboarding/domain");
+    } catch {
+      setError("Failed to create department. Please try again.");
+      setSaving(false);
     }
   }
 
@@ -181,7 +213,7 @@ export default function DepartmentCreationPage() {
 
           {/* Chat input */}
           <div className="relative flex border border-border bg-surface focus-within:border-primary/60 transition-colors">
-            <DepartmentGuide />
+            {/* Guide removed — using Supabase */}
             <input
               type="text"
               value={input}
@@ -332,9 +364,9 @@ export default function DepartmentCreationPage() {
 
           {/* Continue button */}
           <div className="mt-8 flex justify-end">
-            <Link
-              href={selected ? "/onboarding/domain" : "#"}
+            <button
               onClick={handleContinue}
+              disabled={saving}
               className={cn(
                 "flex items-center gap-2 px-5 h-10 border font-mono text-[10px] uppercase tracking-[0.1em] transition-colors",
                 selected
@@ -342,9 +374,9 @@ export default function DepartmentCreationPage() {
                   : "border-border text-foreground-dim cursor-not-allowed"
               )}
             >
-              Continue
+              {saving ? "Creating..." : "Continue"}
               <IconArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            </button>
           </div>
         </div>
       </div>

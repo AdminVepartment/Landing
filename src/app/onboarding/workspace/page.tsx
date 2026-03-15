@@ -1,12 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IconChevronDown } from "@/components/icons";
-import { WorkspaceGuide } from "./guide";
-import { useActivity } from "@/lib/activity-store";
+import { createClient } from "@/lib/supabase/client";
 
 function LogoMark() {
   return (
@@ -66,11 +66,45 @@ const CURRENT_STEP = 4;
 
 export default function WorkspaceCreationPage() {
   const router = useRouter();
-  const { log } = useActivity();
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [teamSize, setTeamSize] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleCreateWorkspace() {
-    log({ icon: "workspace", title: "Workspace created", dept: "System", context: "Acme Workspace initialized" });
-    router.push("/onboarding/department");
+  async function handleCreateWorkspace() {
+    if (!workspaceName.trim()) {
+      setError("Please enter a workspace name.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/auth/signin"); return; }
+
+      const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+      const { data: workspace, error: wsError } = await supabase
+        .from("workspaces")
+        .insert({ name: orgName || workspaceName, slug, owner_id: user.id })
+        .select()
+        .single();
+
+      if (wsError) { setError(wsError.message); setLoading(false); return; }
+
+      await supabase.from("profiles").update({ workspace_id: workspace.id, role: "owner" }).eq("id", user.id);
+      await supabase.from("workspace_settings").insert({ workspace_id: workspace.id, settings: { industry, teamSize } });
+
+      router.push("/onboarding/department");
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -129,9 +163,13 @@ export default function WorkspaceCreationPage() {
             </p>
           </div>
 
+          {/* Error */}
+          {error && (
+            <div className="mb-5 border border-error/40 bg-error/5 px-4 py-3 text-sm text-error">{error}</div>
+          )}
+
           {/* Zone 2 — Input panel */}
           <div className="relative flex flex-col gap-5 mb-10">
-            <WorkspaceGuide />
             {/* Workspace Name */}
             <div className="flex flex-col gap-1.5">
               <FieldLabel label="Workspace Name" htmlFor="workspace-name" />
@@ -139,6 +177,8 @@ export default function WorkspaceCreationPage() {
                 id="workspace-name"
                 type="text"
                 placeholder="Acme Workspace"
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
                 className="rounded-none bg-surface border-border h-10 text-sm placeholder:text-foreground-dim focus-visible:ring-primary/50"
               />
             </div>
@@ -150,6 +190,8 @@ export default function WorkspaceCreationPage() {
                 id="org-name"
                 type="text"
                 placeholder="Acme Corporation"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
                 className="rounded-none bg-surface border-border h-10 text-sm placeholder:text-foreground-dim focus-visible:ring-primary/50"
               />
             </div>
@@ -164,7 +206,8 @@ export default function WorkspaceCreationPage() {
                     id="industry"
                     className="w-full h-10 bg-surface border border-border px-3 pr-8 text-sm text-foreground-muted appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
                     style={{ colorScheme: "dark" }}
-                    defaultValue=""
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
                   >
                     <option value="" disabled>
                       Select industry
@@ -189,7 +232,8 @@ export default function WorkspaceCreationPage() {
                     id="team-size"
                     className="w-full h-10 bg-surface border border-border px-3 pr-8 text-sm text-foreground-muted appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
                     style={{ colorScheme: "dark" }}
-                    defaultValue=""
+                    value={teamSize}
+                    onChange={(e) => setTeamSize(e.target.value)}
                   >
                     <option value="" disabled>
                       Select size
@@ -215,8 +259,9 @@ export default function WorkspaceCreationPage() {
               size="lg"
               className="w-full h-11"
               onClick={handleCreateWorkspace}
+              disabled={loading}
             >
-              Create Workspace
+              {loading ? "Creating workspace..." : "Create Workspace"}
             </Button>
           </div>
         </div>

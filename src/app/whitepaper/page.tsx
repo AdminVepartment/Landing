@@ -118,7 +118,7 @@ export default function WhitepaperPage() {
               {Math.round(progress)}%
             </span>
             <Link
-              href="/landing"
+              href="/"
               className="inline-flex items-center gap-2 h-8 px-4 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
             >
               <ArrowLeft size={14} />

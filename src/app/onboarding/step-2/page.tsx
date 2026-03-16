@@ -590,19 +590,23 @@ export default function OnboardingStep2() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
                 {DEPARTMENTS.map(({ name, slug, icon: Icon, colorVar, color, desc }) => {
                   const isSelected = selectedDepts.includes(slug);
+                  const isEnabled = slug === "marketing";
                   return (
                     <button
                       key={slug}
-                      onClick={() => toggleDept(slug)}
+                      onClick={() => isEnabled && toggleDept(slug)}
+                      disabled={!isEnabled}
                       style={{
                         "--dept-hover-main": `var(--dept-${colorVar}-main)`,
                         "--dept-hover-light": `var(--dept-${colorVar}-light)`,
                       } as React.CSSProperties}
                       className={cn(
                         "dept-card group relative flex flex-col items-center gap-3 py-6 px-3 border bg-surface transition-all text-center",
+                        !isEnabled && "opacity-40 cursor-not-allowed",
                         isSelected
                           ? "border-[var(--dept-hover-main)] ring-1 ring-[var(--dept-hover-main)]/30"
-                          : "border-border hover:border-border/80"
+                          : "border-border",
+                        isEnabled && !isSelected && "hover:border-border/80"
                       )}
                     >
                       <Icon
@@ -619,6 +623,9 @@ export default function OnboardingStep2() {
                         <div className="absolute top-2 right-2 w-4 h-4 flex items-center justify-center" style={{ backgroundColor: color }}>
                           <IconCheck size={10} className="text-background" strokeWidth={2} />
                         </div>
+                      )}
+                      {!isEnabled && (
+                        <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-foreground-dim mt-1">Coming soon</span>
                       )}
                     </button>
                   );
@@ -657,45 +664,57 @@ export default function OnboardingStep2() {
                 <div className="mb-5 border border-error/40 bg-error/5 px-4 py-3 text-sm text-error">{error}</div>
               )}
 
-              {/* Domain selection per department */}
-              <div className="flex flex-col gap-6 mb-10">
+              {/* Domain selection per department — card grid style */}
+              <div className="flex flex-col gap-8 mb-10">
                 {activeDepts.map((dept) => {
                   const domainsForDept = selectedDomains[dept.slug] || [];
                   return (
-                    <div key={dept.slug} className="border border-border bg-surface">
-                      {/* Dept header */}
-                      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+                    <div key={dept.slug}>
+                      {/* Dept label */}
+                      <div className="flex items-center gap-3 mb-4">
                         <div className="w-3 h-3" style={{ backgroundColor: dept.color }} />
                         <span className="text-sm font-medium text-foreground">{dept.name}</span>
                         <span className="text-[10px] font-mono text-foreground-dim ml-auto">
                           {domainsForDept.length === 0 ? "All domains" : `${domainsForDept.length} selected`}
                         </span>
                       </div>
-                      {/* Domain list */}
-                      <div className="divide-y divide-border-subtle">
+                      {/* Domain cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {dept.domains.map((domain) => {
                           const isActive = domainsForDept.includes(domain.slug);
+                          const isEnabled = domain.slug === "social-messaging";
                           return (
                             <button
                               key={domain.slug}
-                              onClick={() => toggleDomain(dept.slug, domain.slug)}
+                              onClick={() => isEnabled && toggleDomain(dept.slug, domain.slug)}
+                              disabled={!isEnabled}
+                              style={{
+                                "--dept-hover-main": `var(--dept-${dept.colorVar}-main)`,
+                                "--dept-hover-light": `var(--dept-${dept.colorVar}-light)`,
+                              } as React.CSSProperties}
                               className={cn(
-                                "w-full flex items-center gap-3 px-5 py-3 text-left transition-colors",
-                                isActive ? "bg-primary/5" : "hover:bg-surface-raised/50"
+                                "dept-card group relative flex flex-col items-center justify-center gap-2 py-5 px-3 border bg-surface transition-all text-center",
+                                !isEnabled && "opacity-40 cursor-not-allowed",
+                                isActive
+                                  ? "border-[var(--dept-hover-main)] ring-1 ring-[var(--dept-hover-main)]/30"
+                                  : "border-border",
+                                isEnabled && !isActive && "hover:border-border/80"
                               )}
                             >
-                              <div className={cn(
-                                "w-4 h-4 border flex items-center justify-center shrink-0 transition-colors",
-                                isActive ? "border-primary bg-primary" : "border-border"
-                              )}>
-                                {isActive && <IconCheck size={10} className="text-background" strokeWidth={2} />}
-                              </div>
                               <span className={cn(
-                                "text-sm transition-colors",
-                                isActive ? "text-foreground" : "text-foreground-muted"
+                                "font-mono text-[9px] uppercase tracking-[0.1em] transition-colors",
+                                isActive ? "text-[var(--dept-hover-main)]" : "text-foreground-dim"
                               )}>
                                 {domain.name}
                               </span>
+                              {isActive && (
+                                <div className="absolute top-2 right-2 w-4 h-4 flex items-center justify-center" style={{ backgroundColor: dept.color }}>
+                                  <IconCheck size={10} className="text-background" strokeWidth={2} />
+                                </div>
+                              )}
+                              {!isEnabled && (
+                                <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-foreground-dim">Coming soon</span>
+                              )}
                             </button>
                           );
                         })}

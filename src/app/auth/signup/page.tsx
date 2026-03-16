@@ -67,7 +67,7 @@ export default function SignUpPage() {
       return;
     }
 
-    router.push("/onboarding/workspace");
+    router.push("/onboarding/step-1");
   }
 
   async function handleGoogleSignUp() {

@@ -29,28 +29,53 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protected routes — redirect to signin if not authenticated
-  const protectedPaths = ["/dashboard", "/onboarding"];
-  const isProtected = protectedPaths.some((p) =>
-    request.nextUrl.pathname.startsWith(p)
-  );
+  const pathname = request.nextUrl.pathname;
 
-  if (isProtected && !user) {
+  // Public routes — no auth needed
+  const publicPaths = ["/", "/landing", "/whitepaper", "/privacy", "/terms", "/auth", "/design-system"];
+  const isPublic = publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  if (isPublic) return supabaseResponse;
+
+  // Not signed in → redirect to signin
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/signin";
-    url.searchParams.set("redirect", request.nextUrl.pathname);
+    url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
   }
 
-  // If signed in and visiting auth pages, redirect to dashboard
-  const authPaths = ["/auth/signin", "/auth/signup"];
-  const isAuthPage = authPaths.some((p) =>
-    request.nextUrl.pathname.startsWith(p)
-  );
+  // Signed in → check if onboarding is complete
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("workspace_id")
+    .eq("id", user.id)
+    .single();
 
-  if (isAuthPage && user) {
+  const hasWorkspace = !!profile?.workspace_id;
+
+  // On onboarding pages
+  if (pathname.startsWith("/onboarding")) {
+    // Already onboarded → go to dashboard
+    if (hasWorkspace && pathname === "/onboarding/step-1") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return supabaseResponse;
+  }
+
+  // On dashboard/protected pages — need workspace
+  if (pathname.startsWith("/dashboard") && !hasWorkspace) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/onboarding/step-1";
+    return NextResponse.redirect(url);
+  }
+
+  // Signed in on auth pages → redirect to dashboard
+  if (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup")) {
+    const url = request.nextUrl.clone();
+    url.pathname = hasWorkspace ? "/dashboard" : "/onboarding/step-1";
     return NextResponse.redirect(url);
   }
 

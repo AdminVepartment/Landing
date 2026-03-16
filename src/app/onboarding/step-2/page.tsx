@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import {
+  IconArrowRight,
+  IconLoader,
+  IconAlertCircle,
   IconMarketing,
   IconBranding,
   IconProduct,
@@ -13,16 +15,13 @@ import {
   IconOperations,
   IconFinanceDept,
   IconHRTalent,
-  IconArrowRight,
-  IconCheck,
-  IconSend,
-  IconLoader,
-  IconBot,
-  IconUser,
 } from "@/components/icons";
+import { IconSocialMessaging } from "@/components/icons/vepartment";
+import type { SVGProps } from "react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import type { SVGProps } from "react";
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
 
 function LogoMark() {
   return (
@@ -37,6 +36,8 @@ function LogoMark() {
   );
 }
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 type VIcon = SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number | string };
 
 interface DeptDef {
@@ -45,339 +46,144 @@ interface DeptDef {
   icon: (p: VIcon) => React.ReactElement;
   colorVar: string;
   color: string;
-  desc: string;
-  domains: { name: string; slug: string }[];
+  active: boolean;
 }
+
+interface DomainDef {
+  name: string;
+  slug: string;
+  icon?: (p: VIcon) => React.ReactElement;
+  active: boolean;
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
 
 const DEPARTMENTS: DeptDef[] = [
-  {
-    name: "Branding", slug: "branding", icon: IconBranding, colorVar: "branding", color: "#EA580C",
-    desc: "Identity, guidelines, visual assets",
-    domains: [
-      { name: "Brand Identity", slug: "brand-identity" },
-      { name: "Visual Assets", slug: "visual-assets" },
-      { name: "Brand Guidelines", slug: "brand-guidelines" },
-      { name: "Brand Strategy", slug: "brand-strategy" },
-    ],
-  },
-  {
-    name: "Marketing", slug: "marketing", icon: IconMarketing, colorVar: "marketing", color: "#4F46E5",
-    desc: "Campaigns, content, analytics",
-    domains: [
-      { name: "Social & Messaging", slug: "social-messaging" },
-      { name: "Campaign Planning", slug: "campaign-planning" },
-      { name: "Content Creation", slug: "content-creation" },
-      { name: "Performance Analytics", slug: "performance-analytics" },
-      { name: "Customer Insights", slug: "customer-insights" },
-    ],
-  },
-  {
-    name: "Sustainability", slug: "sustainability", icon: IconSustainability, colorVar: "sustainability", color: "#0D9488",
-    desc: "ESG reporting, impact tracking",
-    domains: [
-      { name: "ESG Reporting", slug: "esg-reporting" },
-      { name: "Impact Measurement", slug: "impact-measurement" },
-      { name: "Compliance", slug: "compliance" },
-      { name: "Supply Chain", slug: "supply-chain" },
-    ],
-  },
-  {
-    name: "Sales", slug: "sales", icon: IconSales, colorVar: "sales", color: "#059669",
-    desc: "Pipeline, outreach, conversion",
-    domains: [
-      { name: "Lead Generation", slug: "lead-generation" },
-      { name: "Pipeline Management", slug: "pipeline-management" },
-      { name: "Outreach", slug: "outreach" },
-      { name: "Sales Analytics", slug: "sales-analytics" },
-    ],
-  },
-  {
-    name: "Product", slug: "product", icon: IconProduct, colorVar: "product", color: "#0284C7",
-    desc: "Features, roadmap, development",
-    domains: [
-      { name: "Product Strategy", slug: "product-strategy" },
-      { name: "Feature Development", slug: "feature-development" },
-      { name: "User Research", slug: "user-research" },
-      { name: "Roadmap", slug: "roadmap" },
-    ],
-  },
-  {
-    name: "Operations", slug: "operations", icon: IconOperations, colorVar: "operations", color: "#52525B",
-    desc: "Processes, workflows, coordination",
-    domains: [
-      { name: "Process Optimization", slug: "process-optimization" },
-      { name: "Workflow Automation", slug: "workflow-automation" },
-      { name: "Resource Management", slug: "resource-management" },
-    ],
-  },
-  {
-    name: "Finance", slug: "finance", icon: IconFinanceDept, colorVar: "finance", color: "#B45309",
-    desc: "Budgets, reporting, compliance",
-    domains: [
-      { name: "Financial Reporting", slug: "financial-reporting" },
-      { name: "Budget Planning", slug: "budget-planning" },
-      { name: "Expense Management", slug: "expense-management" },
-    ],
-  },
-  {
-    name: "HR / Talent", slug: "hr", icon: IconHRTalent, colorVar: "hr", color: "#A21CAF",
-    desc: "Hiring, culture, people ops",
-    domains: [
-      { name: "Recruitment", slug: "recruitment" },
-      { name: "Onboarding", slug: "employee-onboarding" },
-      { name: "Culture & Engagement", slug: "culture-engagement" },
-    ],
-  },
+  { name: "Marketing", slug: "marketing", icon: IconMarketing, colorVar: "marketing", color: "#4F46E5", active: true },
+  { name: "Branding", slug: "branding", icon: IconBranding, colorVar: "branding", color: "#EA580C", active: false },
+  { name: "Product", slug: "product", icon: IconProduct, colorVar: "product", color: "#0284C7", active: false },
+  { name: "Sales", slug: "sales", icon: IconSales, colorVar: "sales", color: "#059669", active: false },
+  { name: "Sustainability", slug: "sustainability", icon: IconSustainability, colorVar: "sustainability", color: "#0D9488", active: false },
+  { name: "Operations", slug: "operations", icon: IconOperations, colorVar: "operations", color: "#52525B", active: false },
+  { name: "Finance", slug: "finance", icon: IconFinanceDept, colorVar: "finance", color: "#B45309", active: false },
+  { name: "HR / Talent", slug: "hr", icon: IconHRTalent, colorVar: "hr", color: "#A21CAF", active: false },
 ];
 
-// ── Chat types ────────────────────────────────────────────────────────────
+const MARKETING_DOMAINS: DomainDef[] = [
+  { name: "Social & Messaging", slug: "social-messaging", icon: IconSocialMessaging, active: true },
+  { name: "Campaign Planning", slug: "campaign-planning", active: false },
+  { name: "Content Creation", slug: "content-creation", active: false },
+  { name: "Performance Analytics", slug: "performance-analytics", active: false },
+  { name: "Customer Insights", slug: "customer-insights", active: false },
+  { name: "Trend Analysis", slug: "trend-analysis", active: false },
+];
 
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  isStreaming?: boolean;
-}
+const N8N_WEBHOOK = "https://vepartment.app.n8n.cloud/webhook/50cd53b3-e5dc-40a6-a5c4-e6bde8c0ebab/chat";
 
-const N8N_WEBHOOK_URL =
-  "https://vepartment.app.n8n.cloud/webhook/50cd53b3-e5dc-40a6-a5c4-e6bde8c0ebab/chat";
+// ── Page ──────────────────────────────────────────────────────────────────────
 
-function generateSessionId(): string {
-  return crypto.randomUUID();
-}
-
-// ── Phase: departments → domains → launch ─────────────────────────────────
-
-type Phase = "departments" | "domains";
+type Phase = "department" | "domain";
 
 export default function OnboardingStep2() {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>("departments");
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [selectedDomains, setSelectedDomains] = useState<Record<string, string[]>>({});
-  const [chatInput, setChatInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [sessionId] = useState(() => generateSessionId());
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<Phase>("department");
 
-  function toggleDept(slug: string) {
-    setSelectedDepts((prev) => {
-      const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
-      // Init domain selections for new depts
-      if (!prev.includes(slug)) {
-        setSelectedDomains((d) => ({ ...d, [slug]: [] }));
-      }
-      return next;
-    });
-    setError("");
-  }
+  // Chat
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [suggestion, setSuggestion] = useState<string | null>(null);
 
-  function toggleDomain(deptSlug: string, domainSlug: string) {
-    setSelectedDomains((prev) => {
-      const current = prev[deptSlug] || [];
-      return {
-        ...prev,
-        [deptSlug]: current.includes(domainSlug)
-          ? current.filter((s) => s !== domainSlug)
-          : [...current, domainSlug],
-      };
-    });
-  }
+  // Department
+  const [selectedDept, setSelectedDept] = useState<string | null>(null);
 
-  // Scroll chat to bottom
-  const scrollToBottom = useCallback(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, []);
+  // Domain
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  // State
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Auto-select departments from AI response or user input
-  function autoSelectDepartments(text: string) {
-    const lower = text.toLowerCase();
-    const autoSelect: string[] = [];
-    if (lower.includes("brand")) autoSelect.push("branding");
-    if (lower.includes("market") || lower.includes("campaign") || lower.includes("content")) autoSelect.push("marketing");
-    if (lower.includes("sustain") || lower.includes("esg") || lower.includes("impact")) autoSelect.push("sustainability");
-    if (lower.includes("sale") || lower.includes("pipeline") || lower.includes("lead")) autoSelect.push("sales");
-    if (lower.includes("product") || lower.includes("feature") || lower.includes("roadmap")) autoSelect.push("product");
-    if (lower.includes("operation") || lower.includes("process") || lower.includes("workflow")) autoSelect.push("operations");
-    if (lower.includes("financ") || lower.includes("budget")) autoSelect.push("finance");
-    if (lower.includes("hr") || lower.includes("hiring") || lower.includes("talent")) autoSelect.push("hr");
-
-    if (autoSelect.length > 0) {
-      setSelectedDepts((prev) => [...new Set([...prev, ...autoSelect])]);
-      autoSelect.forEach((slug) => {
-        setSelectedDomains((d) => ({ ...d, [slug]: d[slug] || [] }));
-      });
-    }
-  }
-
+  // ── Chat submit → n8n ────────────────────────────────────────────
   async function handleChatSubmit() {
-    const input = chatInput.trim();
-    if (!input || isStreaming) return;
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
 
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: input,
-    };
-
-    // Auto-select from user input
-    autoSelectDepartments(input);
-
-    const assistantMsgId = crypto.randomUUID();
-    const assistantMsg: ChatMessage = {
-      id: assistantMsgId,
-      role: "assistant",
-      content: "",
-      isStreaming: true,
-    };
-
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setChatInput("");
-    setIsStreaming(true);
+    setIsLoading(true);
+    setSuggestion(null);
+    setError(null);
 
     try {
-      const response = await fetch(N8N_WEBHOOK_URL, {
+      const res = await fetch(N8N_WEBHOOK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId,
-          chatInput: input,
+          sessionId: crypto.randomUUID(),
+          chatInput: trimmed,
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error("Failed to connect to AI assistant");
-      }
+      if (!res.ok || !res.body) throw new Error("Failed");
 
-      const reader = response.body.getReader();
+      // Read streaming response
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let fullContent = "";
+      let fullText = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        // Keep incomplete last line in buffer
         buffer = lines.pop() || "";
-
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
+          const t = line.trim();
+          if (!t) continue;
           try {
-            const parsed = JSON.parse(trimmed) as {
-              type?: string;
-              content?: string;
-              output?: string;
-            };
-
-            if (parsed.type === "item" && parsed.content) {
-              fullContent += parsed.content;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: fullContent }
-                    : m
-                )
-              );
-            } else if (parsed.output) {
-              // Some n8n webhooks return a single JSON with output
-              fullContent += parsed.output;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: fullContent }
-                    : m
-                )
-              );
-            }
-          } catch {
-            // If it's not JSON, treat as raw text token
-            if (trimmed && trimmed !== "[DONE]") {
-              fullContent += trimmed;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: fullContent }
-                    : m
-                )
-              );
-            }
-          }
+            const p = JSON.parse(t);
+            if (p.type === "item" && p.content) fullText += p.content;
+          } catch { /* skip */ }
         }
       }
 
-      // Process any remaining buffer
-      if (buffer.trim()) {
-        try {
-          const parsed = JSON.parse(buffer.trim()) as {
-            type?: string;
-            content?: string;
-            output?: string;
-          };
-          if (parsed.type === "item" && parsed.content) {
-            fullContent += parsed.content;
-          } else if (parsed.output) {
-            fullContent += parsed.output;
-          }
-        } catch {
-          if (buffer.trim() && buffer.trim() !== "[DONE]") {
-            fullContent += buffer.trim();
-          }
-        }
+      setSuggestion(fullText || "I can help you choose the right department. Tell me more about your needs.");
+
+      // Auto-select department from response
+      const lower = (trimmed + " " + fullText).toLowerCase();
+      if (lower.includes("market") || lower.includes("campaign") || lower.includes("social")) {
+        setSelectedDept("Marketing");
       }
-
-      // Auto-select departments from AI response
-      autoSelectDepartments(fullContent);
-
-      // Finalize message
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMsgId
-            ? { ...m, content: fullContent || "I can help you choose departments. Tell me about your business needs.", isStreaming: false }
-            : m
-        )
-      );
     } catch {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMsgId
-            ? { ...m, content: "Connection error. Please try again.", isStreaming: false }
-            : m
-        )
-      );
+      setSuggestion("Connection error. Please try again or select a department below.");
     } finally {
-      setIsStreaming(false);
+      setIsLoading(false);
     }
   }
 
-  function handleContinueToDomains() {
-    if (selectedDepts.length === 0) {
-      setError("Select at least one department.");
+  // ── Continue to domain ───────────────────────────────────────────
+  function handleContinueToDomain(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!selectedDept) {
+      setError("Please select a department before continuing.");
       return;
     }
-    setPhase("domains");
-    setError("");
+    setPhase("domain");
+    setError(null);
+    setSuggestion(null);
+    setInput("");
   }
 
-  async function handleLaunch() {
-    setLoading(true);
-    setError("");
+  // ── Launch workspace ─────────────────────────────────────────────
+  async function handleLaunch(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!selectedDomain) {
+      setError("Please select a domain before continuing.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
 
     try {
       const supabase = createClient();
@@ -392,52 +198,44 @@ export default function OnboardingStep2() {
 
       if (!profile?.workspace_id) { router.push("/onboarding/step-1"); return; }
 
-      // Create departments
-      const deptInserts = selectedDepts.map((slug) => {
-        const dept = DEPARTMENTS.find((d) => d.slug === slug)!;
-        return { workspace_id: profile.workspace_id, name: dept.name, slug, color: dept.color, status: "active" };
-      });
+      const dept = DEPARTMENTS.find((d) => d.name === selectedDept)!;
 
-      const { data: createdDepts, error: deptError } = await supabase
+      // Create department
+      const { data: createdDept, error: deptErr } = await supabase
         .from("departments")
-        .insert(deptInserts)
-        .select();
+        .insert({
+          workspace_id: profile.workspace_id,
+          name: dept.name,
+          slug: dept.slug,
+          color: dept.color,
+          status: "active",
+        })
+        .select()
+        .single();
 
-      if (deptError) { setError(deptError.message); setLoading(false); return; }
+      if (deptErr) { setError(deptErr.message); setSaving(false); return; }
 
-      // Create domains for each department
-      const domainInserts: { department_id: string; name: string; slug: string; status: string }[] = [];
-      for (const dept of createdDepts || []) {
-        const deptDef = DEPARTMENTS.find((d) => d.slug === dept.slug);
-        const selectedForDept = selectedDomains[dept.slug] || [];
-        if (deptDef) {
-          const domainsToCreate = selectedForDept.length > 0
-            ? deptDef.domains.filter((d) => selectedForDept.includes(d.slug))
-            : deptDef.domains; // If none selected, create all
-          domainsToCreate.forEach((domain) => {
-            domainInserts.push({
-              department_id: dept.id,
-              name: domain.name,
-              slug: domain.slug,
-              status: "active",
-            });
-          });
-        }
-      }
-
-      if (domainInserts.length > 0) {
-        await supabase.from("domains").insert(domainInserts);
-      }
+      // Create domain
+      const domain = MARKETING_DOMAINS.find((d) => d.name === selectedDomain)!;
+      await supabase.from("domains").insert({
+        department_id: createdDept.id,
+        name: domain.name,
+        slug: domain.slug,
+        status: "active",
+      });
 
       router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  const activeDepts = selectedDepts.map((slug) => DEPARTMENTS.find((d) => d.slug === slug)!).filter(Boolean);
+  // ── Render ───────────────────────────────────────────────────────
+
+  const TOTAL_STEPS = 2;
+  const CURRENT_STEP = 2;
 
   return (
     <div className="relative min-h-screen bg-background flex flex-col">
@@ -446,185 +244,145 @@ export default function OnboardingStep2() {
       {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between px-4 sm:px-8 h-14 border-b border-border shrink-0">
         <Link href="/"><LogoMark /></Link>
-        <span className="font-mono text-[10px] text-foreground-dim tracking-[0.1em]">STEP 2 OF 2</span>
+        <span className="font-mono text-[10px] text-foreground-dim tracking-[0.1em]">
+          SYS · OB · {phase === "department" ? "005" : "006"}
+        </span>
       </div>
 
       {/* Progress */}
-      <div className="relative z-10 flex h-0.5 shrink-0">
-        <div className="bg-primary h-full" style={{ width: phase === "departments" ? "60%" : "100%" }} />
+      <div className="relative z-10 flex h-px shrink-0">
+        <div className="bg-primary h-full transition-all" style={{ width: `${(CURRENT_STEP / TOTAL_STEPS) * 100}%` }} />
         <div className="flex-1 bg-border-subtle" />
       </div>
 
       {/* Main */}
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-10">
-        <div className="w-full max-w-[640px] mx-auto">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 sm:py-14">
+        <div className="w-full max-w-[640px]">
 
-          {/* ── PHASE 1: Departments ──────────────────────────────── */}
-          {phase === "departments" && (
+          {/* ── DEPARTMENT PHASE ────────────────────────────────── */}
+          {phase === "department" && (
             <>
-              <div className="mb-8">
-                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">Departments</span>
-                <h1 className="text-2xl sm:text-3xl font-medium text-foreground tracking-tight mt-2 mb-4">
-                  What departments do you need?
+              {/* System message */}
+              <div className="mb-10">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-5 h-5 border border-primary flex items-center justify-center shrink-0">
+                    <div className="w-1.5 h-1.5 bg-primary" />
+                  </div>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">
+                    Vepartment
+                  </span>
+                  <div className="flex items-center gap-1 ml-1">
+                    {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+                      <div key={i} className={`h-px w-5 ${i < CURRENT_STEP ? "bg-primary/60" : "bg-border"}`} />
+                    ))}
+                    <span className="font-mono text-[9px] text-foreground-dim tracking-[0.08em] ml-1">
+                      {CURRENT_STEP} / {TOTAL_STEPS}
+                    </span>
+                  </div>
+                </div>
+
+                <h1 className="text-[1.5rem] sm:text-[1.875rem] font-medium text-foreground tracking-tight leading-[1.2] mb-4">
+                  What department would you<br />like to create first?
                 </h1>
-                <p className="text-base text-foreground-muted leading-relaxed">
-                  Describe your needs or select directly below.
+                <p className="text-body-md text-foreground-muted leading-relaxed max-w-[460px]">
+                  Describe your organization&apos;s needs and we&apos;ll suggest the right department — or pick one directly below.
                 </p>
               </div>
 
-              {/* Chat conversation */}
-              <div className="border border-border bg-surface mb-8">
-                {/* Chat header */}
-                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
-                  <IconBot size={14} className="text-primary" />
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground-muted">
-                    Department Advisor
-                  </span>
-                  {isStreaming && (
-                    <span className="ml-auto flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-primary animate-pulse" />
-                      <span className="font-mono text-[9px] text-primary tracking-[0.08em]">STREAMING</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Chat messages area */}
-                <div
-                  ref={chatContainerRef}
-                  className="max-h-[280px] overflow-y-auto px-4 py-3 flex flex-col gap-3"
+              {/* Chat input */}
+              <div className="relative flex border border-border bg-surface focus-within:border-primary/60 transition-colors">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSubmit(); } }}
+                  disabled={isLoading}
+                  placeholder={'e.g. "We need to grow brand awareness and run campaigns…"'}
+                  className="flex-1 h-14 bg-transparent px-5 text-sm text-foreground placeholder:text-foreground-dim focus:outline-none disabled:opacity-50"
+                />
+                <button
+                  onClick={handleChatSubmit}
+                  disabled={isLoading || !input.trim()}
+                  className="w-14 h-14 flex items-center justify-center border-l border-border hover:bg-surface-raised hover:text-primary transition-colors shrink-0 text-foreground-dim disabled:opacity-50"
                 >
-                  {messages.length === 0 && (
-                    <div className="text-center py-6">
-                      <p className="text-xs text-foreground-dim font-mono">
-                        Describe your business needs and I will recommend departments.
-                      </p>
-                    </div>
-                  )}
-
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={cn(
-                        "flex gap-2.5 max-w-[90%]",
-                        msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
-                      )}
-                    >
-                      {/* Avatar */}
-                      <div
-                        className={cn(
-                          "w-6 h-6 shrink-0 flex items-center justify-center border",
-                          msg.role === "user"
-                            ? "border-border bg-surface-raised"
-                            : "border-primary/40 bg-primary/10"
-                        )}
-                      >
-                        {msg.role === "user" ? (
-                          <IconUser size={12} className="text-foreground-muted" />
-                        ) : (
-                          <IconBot size={12} className="text-primary" />
-                        )}
-                      </div>
-
-                      {/* Bubble */}
-                      <div
-                        className={cn(
-                          "px-3 py-2 text-sm leading-relaxed border",
-                          msg.role === "user"
-                            ? "bg-surface-raised border-border text-foreground"
-                            : "bg-surface border-border-subtle text-foreground-muted"
-                        )}
-                      >
-                        {msg.content}
-                        {msg.isStreaming && !msg.content && (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="w-1 h-1 bg-primary animate-pulse" />
-                            <span className="w-1 h-1 bg-primary animate-pulse [animation-delay:150ms]" />
-                            <span className="w-1 h-1 bg-primary animate-pulse [animation-delay:300ms]" />
-                          </span>
-                        )}
-                        {msg.isStreaming && msg.content && (
-                          <span className="inline-block w-[2px] h-3.5 bg-primary animate-pulse ml-0.5 align-text-bottom" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Chat input */}
-                <div className="flex border-t border-border">
-                  <span className="pl-4 pr-2 flex items-center text-primary font-mono text-sm select-none">&gt;</span>
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleChatSubmit();
-                      }
-                    }}
-                    placeholder="e.g. I need branding and marketing for my fashion brand..."
-                    disabled={isStreaming}
-                    className="flex-1 h-11 bg-transparent text-sm text-foreground font-mono placeholder:text-foreground-dim focus:outline-none pr-4 disabled:opacity-50"
-                  />
-                  <button
-                    onClick={handleChatSubmit}
-                    disabled={!chatInput.trim() || isStreaming}
-                    className="w-11 h-11 flex items-center justify-center border-l border-border text-foreground-dim hover:text-primary transition-colors disabled:opacity-40"
-                  >
-                    {isStreaming ? (
-                      <IconLoader size={14} className="animate-spin" />
-                    ) : (
-                      <IconSend size={14} />
-                    )}
-                  </button>
-                </div>
+                  {isLoading ? <IconLoader className="h-4 w-4 animate-spin" /> : <IconArrowRight className="h-4 w-4" />}
+                </button>
               </div>
 
-              {error && (
-                <div className="mb-5 border border-error/40 bg-error/5 px-4 py-3 text-sm text-error">{error}</div>
+              {/* AI Suggestion */}
+              {(suggestion || isLoading) && (
+                <div className="border border-border border-t-0 bg-surface px-5 py-4 mb-10">
+                  <div className="flex items-start gap-3">
+                    <div className="w-4 h-4 border border-primary flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-1 h-1 bg-primary" />
+                    </div>
+                    <div>
+                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-primary block mb-1.5">
+                        Vepartment · Suggestion
+                      </span>
+                      {isLoading ? (
+                        <p className="text-body-md text-foreground-dim">Analyzing your needs...</p>
+                      ) : (
+                        <p className="text-body-md text-foreground-muted leading-relaxed">{suggestion}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
 
-              {/* Department grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                {DEPARTMENTS.map(({ name, slug, icon: Icon, colorVar, color, desc }) => {
-                  const isSelected = selectedDepts.includes(slug);
-                  const isEnabled = slug === "marketing";
+              {!suggestion && !isLoading && <div className="mb-10" />}
+
+              {/* Divider */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex-1 h-px bg-border" />
+                <span className="font-mono text-[9px] text-foreground-dim tracking-[0.14em] uppercase">
+                  {suggestion ? "Select Department" : "All Departments"}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              {/* Department cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {DEPARTMENTS.map(({ name, icon: Icon, colorVar, active }) => {
+                  const isSuggested = suggestion && selectedDept === name;
+                  const isSelected = selectedDept === name;
+
                   return (
                     <button
-                      key={slug}
-                      onClick={() => isEnabled && toggleDept(slug)}
-                      disabled={!isEnabled}
+                      key={name}
+                      type="button"
+                      onClick={() => { if (!active) return; setSelectedDept(name); setError(null); }}
+                      disabled={!active}
                       style={{
                         "--dept-hover-main": `var(--dept-${colorVar}-main)`,
                         "--dept-hover-light": `var(--dept-${colorVar}-light)`,
                       } as React.CSSProperties}
                       className={cn(
-                        "dept-card group relative flex flex-col items-center gap-3 py-6 px-3 border bg-surface transition-all text-center",
-                        !isEnabled && "opacity-40 cursor-not-allowed",
+                        "dept-card group relative flex flex-col items-center justify-center gap-3 py-6 px-3 border bg-surface transition-all",
+                        active ? "cursor-pointer" : "cursor-not-allowed opacity-40",
                         isSelected
                           ? "border-[var(--dept-hover-main)] ring-1 ring-[var(--dept-hover-main)]/30"
                           : "border-border",
-                        isEnabled && !isSelected && "hover:border-border/80"
+                        active && !isSelected && "hover:border-border/80"
                       )}
                     >
                       <Icon
                         className={cn("dept-icon transition-colors", isSelected ? "text-[var(--dept-hover-main)]" : "text-foreground-muted")}
                         size={28} strokeWidth={1.5}
                       />
-                      <div>
-                        <span className={cn("font-mono text-[9px] uppercase tracking-[0.1em] transition-colors block", isSelected ? "text-[var(--dept-hover-main)]" : "text-foreground-dim")}>
-                          {name}
+                      <span className={cn(
+                        "font-mono text-[9px] uppercase tracking-[0.1em] transition-colors text-center leading-tight",
+                        isSelected ? "text-[var(--dept-hover-main)]" : "text-foreground-dim group-hover:text-foreground-muted"
+                      )}>
+                        {name}
+                      </span>
+                      {isSuggested && (
+                        <span className="mt-1 px-2 py-0.5 font-mono text-[7px] uppercase tracking-[0.14em] font-semibold"
+                          style={{ backgroundColor: `var(--dept-${colorVar}-main)`, color: "#0D0D0F" }}>
+                          Suggested
                         </span>
-                        <span className="text-[9px] text-foreground-dim mt-1 block leading-tight">{desc}</span>
-                      </div>
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-4 h-4 flex items-center justify-center" style={{ backgroundColor: color }}>
-                          <IconCheck size={10} className="text-background" strokeWidth={2} />
-                        </div>
                       )}
-                      {!isEnabled && (
+                      {!active && (
                         <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-foreground-dim mt-1">Coming soon</span>
                       )}
                     </button>
@@ -632,108 +390,135 @@ export default function OnboardingStep2() {
                 })}
               </div>
 
-              {selectedDepts.length > 0 && (
-                <p className="text-xs font-mono text-foreground-muted mb-6">
-                  {selectedDepts.length} department{selectedDepts.length > 1 ? "s" : ""} selected
-                </p>
+              {/* Error */}
+              {error && (
+                <div className="flex items-center gap-2 mt-4">
+                  <IconAlertCircle size={14} strokeWidth={1.5} className="text-error shrink-0" />
+                  <span className="font-mono text-[10px] text-error tracking-[0.04em]">{error}</span>
+                </div>
               )}
 
-              <Button variant="solid" size="lg" className="w-full h-11" onClick={handleContinueToDomains}>
-                Continue — Select Domains
-              </Button>
+              {/* Continue */}
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={handleContinueToDomain}
+                  className={cn(
+                    "flex items-center gap-2 px-5 h-10 border font-mono text-[10px] uppercase tracking-[0.1em] transition-colors",
+                    selectedDept
+                      ? "border-primary text-primary hover:bg-primary/10"
+                      : "border-border text-foreground-dim cursor-not-allowed"
+                  )}
+                >
+                  Continue
+                  <IconArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </>
           )}
 
-          {/* ── PHASE 2: Domains ──────────────────────────────────── */}
-          {phase === "domains" && (
+          {/* ── DOMAIN PHASE ───────────────────────────────────── */}
+          {phase === "domain" && (
             <>
-              <div className="mb-8">
-                <button onClick={() => setPhase("departments")} className="text-xs font-mono text-foreground-dim hover:text-foreground transition-colors mb-4 block">
+              <div className="mb-10">
+                <button onClick={() => { setPhase("department"); setError(null); }} className="inline-flex items-center gap-1.5 text-label-sm text-foreground-dim hover:text-foreground-muted transition-colors mb-6">
                   ← Back to departments
                 </button>
-                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">Domains</span>
-                <h1 className="text-2xl sm:text-3xl font-medium text-foreground tracking-tight mt-2 mb-4">
-                  Choose what each department works on.
+
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-5 h-5 border border-primary flex items-center justify-center shrink-0">
+                    <div className="w-1.5 h-1.5 bg-primary" />
+                  </div>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">
+                    Vepartment · {selectedDept}
+                  </span>
+                </div>
+
+                <h1 className="text-[1.5rem] sm:text-[1.875rem] font-medium text-foreground tracking-tight leading-[1.2] mb-4">
+                  Which domain would you<br />like to activate first?
                 </h1>
-                <p className="text-base text-foreground-muted leading-relaxed">
-                  Select the domains you want active. Leave empty to activate all.
+                <p className="text-body-md text-foreground-muted leading-relaxed max-w-[460px]">
+                  Each domain is a focused area within your department. Start with one — you can add more later.
                 </p>
               </div>
 
-              {error && (
-                <div className="mb-5 border border-error/40 bg-error/5 px-4 py-3 text-sm text-error">{error}</div>
-              )}
+              {/* Divider */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex-1 h-px bg-border" />
+                <span className="font-mono text-[9px] text-foreground-dim tracking-[0.14em] uppercase">
+                  {selectedDept} Domains
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
 
-              {/* Domain selection per department — card grid style */}
-              <div className="flex flex-col gap-8 mb-10">
-                {activeDepts.map((dept) => {
-                  const domainsForDept = selectedDomains[dept.slug] || [];
+              {/* Domain cards — same style as department cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {MARKETING_DOMAINS.map(({ name, slug, icon: Icon, active }) => {
+                  const isSelected = selectedDomain === name;
+                  const deptColorVar = DEPARTMENTS.find(d => d.name === selectedDept)?.colorVar || "marketing";
+
                   return (
-                    <div key={dept.slug}>
-                      {/* Dept label */}
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-3 h-3" style={{ backgroundColor: dept.color }} />
-                        <span className="text-sm font-medium text-foreground">{dept.name}</span>
-                        <span className="text-[10px] font-mono text-foreground-dim ml-auto">
-                          {domainsForDept.length === 0 ? "All domains" : `${domainsForDept.length} selected`}
-                        </span>
-                      </div>
-                      {/* Domain cards */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {dept.domains.map((domain) => {
-                          const isActive = domainsForDept.includes(domain.slug);
-                          const isEnabled = domain.slug === "social-messaging";
-                          return (
-                            <button
-                              key={domain.slug}
-                              onClick={() => isEnabled && toggleDomain(dept.slug, domain.slug)}
-                              disabled={!isEnabled}
-                              style={{
-                                "--dept-hover-main": `var(--dept-${dept.colorVar}-main)`,
-                                "--dept-hover-light": `var(--dept-${dept.colorVar}-light)`,
-                              } as React.CSSProperties}
-                              className={cn(
-                                "dept-card group relative flex flex-col items-center justify-center gap-2 py-5 px-3 border bg-surface transition-all text-center",
-                                !isEnabled && "opacity-40 cursor-not-allowed",
-                                isActive
-                                  ? "border-[var(--dept-hover-main)] ring-1 ring-[var(--dept-hover-main)]/30"
-                                  : "border-border",
-                                isEnabled && !isActive && "hover:border-border/80"
-                              )}
-                            >
-                              <span className={cn(
-                                "font-mono text-[9px] uppercase tracking-[0.1em] transition-colors",
-                                isActive ? "text-[var(--dept-hover-main)]" : "text-foreground-dim"
-                              )}>
-                                {domain.name}
-                              </span>
-                              {isActive && (
-                                <div className="absolute top-2 right-2 w-4 h-4 flex items-center justify-center" style={{ backgroundColor: dept.color }}>
-                                  <IconCheck size={10} className="text-background" strokeWidth={2} />
-                                </div>
-                              )}
-                              {!isEnabled && (
-                                <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-foreground-dim">Coming soon</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <button
+                      key={slug}
+                      type="button"
+                      onClick={() => { if (!active) return; setSelectedDomain(name); setError(null); }}
+                      disabled={!active}
+                      style={{
+                        "--dept-hover-main": `var(--dept-${deptColorVar}-main)`,
+                        "--dept-hover-light": `var(--dept-${deptColorVar}-light)`,
+                      } as React.CSSProperties}
+                      className={cn(
+                        "dept-card group relative flex flex-col items-center justify-center gap-3 py-6 px-3 border bg-surface transition-all",
+                        active ? "cursor-pointer" : "cursor-not-allowed opacity-40",
+                        isSelected
+                          ? "border-[var(--dept-hover-main)] ring-1 ring-[var(--dept-hover-main)]/30"
+                          : "border-border",
+                        active && !isSelected && "hover:border-border/80"
+                      )}
+                    >
+                      {Icon && (
+                        <Icon
+                          className={cn("dept-icon transition-colors", isSelected ? "text-[var(--dept-hover-main)]" : "text-foreground-muted")}
+                          size={28} strokeWidth={1.5}
+                        />
+                      )}
+                      <span className={cn(
+                        "font-mono text-[9px] uppercase tracking-[0.1em] transition-colors text-center leading-tight",
+                        isSelected ? "text-[var(--dept-hover-main)]" : "text-foreground-dim group-hover:text-foreground-muted"
+                      )}>
+                        {name}
+                      </span>
+                      {!active && (
+                        <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-foreground-dim mt-1">Coming soon</span>
+                      )}
+                    </button>
                   );
                 })}
               </div>
 
-              <Button variant="solid" size="lg" className="w-full h-11" onClick={handleLaunch} disabled={loading}>
-                {loading ? "Launching workspace..." : "Launch Workspace"}
-              </Button>
+              {/* Error */}
+              {error && (
+                <div className="flex items-center gap-2 mt-4">
+                  <IconAlertCircle size={14} strokeWidth={1.5} className="text-error shrink-0" />
+                  <span className="font-mono text-[10px] text-error tracking-[0.04em]">{error}</span>
+                </div>
+              )}
 
-              <button
-                onClick={() => { handleLaunch(); }}
-                className="mt-3 w-full text-center text-xs font-mono text-foreground-dim hover:text-foreground-muted transition-colors py-2 hidden"
-              >
-                Skip domains — activate all
-              </button>
+              {/* Launch */}
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={handleLaunch}
+                  disabled={saving}
+                  className={cn(
+                    "flex items-center gap-2 px-5 h-10 border font-mono text-[10px] uppercase tracking-[0.1em] transition-colors",
+                    selectedDomain
+                      ? "border-primary text-primary hover:bg-primary/10"
+                      : "border-border text-foreground-dim cursor-not-allowed"
+                  )}
+                >
+                  {saving ? "Launching..." : "Launch Workspace"}
+                  <IconArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </>
           )}
 

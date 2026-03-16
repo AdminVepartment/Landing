@@ -140,9 +140,9 @@ function SignInContent() {
                 <label htmlFor="password" className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground-dim">
                   Password
                 </label>
-                <Link href="/auth/forgot-password" className="font-mono text-[10px] text-foreground-dim hover:text-foreground transition-colors">
+                <span className="font-mono text-[10px] text-foreground-dim cursor-default">
                   Forgot password?
-                </Link>
+                </span>
               </div>
               <Input
                 id="password" type="password" placeholder="Enter your password"

@@ -31,21 +31,28 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Public routes — no auth needed
-  const publicPaths = ["/", "/landing", "/whitepaper", "/privacy", "/terms", "/auth", "/design-system"];
+  // ── Public routes — no auth needed ──────────────────────────────
+  const publicPaths = ["/", "/landing", "/whitepaper", "/privacy", "/terms", "/design-system"];
   const isPublic = publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
-
   if (isPublic) return supabaseResponse;
 
-  // Not signed in → redirect to signin
+  // ── Auth callback — always allow ────────────────────────────────
+  if (pathname.startsWith("/auth/callback") || pathname.startsWith("/auth/signout")) {
+    return supabaseResponse;
+  }
+
+  // ── Not signed in ───────────────────────────────────────────────
   if (!user) {
+    // Allow auth pages
+    if (pathname.startsWith("/auth")) return supabaseResponse;
+    // Redirect everything else to signin
     const url = request.nextUrl.clone();
     url.pathname = "/auth/signin";
     url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
   }
 
-  // Signed in → check if onboarding is complete
+  // ── Signed in — check workspace ─────────────────────────────────
   const { data: profile } = await supabase
     .from("profiles")
     .select("workspace_id")
@@ -54,28 +61,28 @@ export async function middleware(request: NextRequest) {
 
   const hasWorkspace = !!profile?.workspace_id;
 
-  // On onboarding pages
+  // Signed in + on auth pages → redirect away
+  if (pathname.startsWith("/auth")) {
+    const url = request.nextUrl.clone();
+    url.pathname = hasWorkspace ? "/dashboard" : "/onboarding/step-1";
+    return NextResponse.redirect(url);
+  }
+
+  // Signed in + on onboarding
   if (pathname.startsWith("/onboarding")) {
-    // Already onboarded → go to dashboard
+    // Already has workspace and trying to go back to step-1 → skip to step-2 or dashboard
     if (hasWorkspace && pathname === "/onboarding/step-1") {
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = "/onboarding/step-2";
       return NextResponse.redirect(url);
     }
     return supabaseResponse;
   }
 
-  // On dashboard/protected pages — need workspace
-  if (pathname.startsWith("/dashboard") && !hasWorkspace) {
+  // Signed in + on dashboard/protected without workspace → onboarding
+  if (!hasWorkspace) {
     const url = request.nextUrl.clone();
     url.pathname = "/onboarding/step-1";
-    return NextResponse.redirect(url);
-  }
-
-  // Signed in on auth pages → redirect to dashboard
-  if (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = hasWorkspace ? "/dashboard" : "/onboarding/step-1";
     return NextResponse.redirect(url);
   }
 

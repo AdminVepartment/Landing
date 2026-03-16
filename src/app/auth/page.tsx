@@ -1,8 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { AuthLandingGuide } from "./guide";
+import { createClient } from "@/lib/supabase/client";
 
-// ── Shared logo mark ─────────────────────────────────────────────────────────
 function LogoMark() {
   return (
     <div className="flex items-center gap-3">
@@ -17,25 +18,31 @@ function LogoMark() {
 }
 
 export default function AuthLandingPage() {
+  async function handleGoogleSignIn() {
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  }
+
   return (
     <div className="relative min-h-screen bg-background flex flex-col">
-
-      {/* Grid background */}
       <div className="absolute inset-0 pointer-events-none bg-grid" />
 
       {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between px-4 sm:px-8 h-14 border-b border-border shrink-0">
-        <LogoMark />
-        <span className="font-mono text-[10px] text-foreground-dim tracking-[0.1em]">
-          SYS · AUTH · 001
-        </span>
+        <Link href="/"><LogoMark /></Link>
+        <span className="font-mono text-[10px] text-foreground-dim tracking-[0.1em]">SYS · AUTH · 001</span>
       </div>
 
       {/* Main */}
       <div className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 py-12">
         <div className="w-full max-w-[440px]">
 
-          {/* Headline block */}
+          {/* Headline */}
           <div className="mb-10 pb-10 border-b border-border">
             <div className="mb-1.5">
               <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">
@@ -51,17 +58,12 @@ export default function AuthLandingPage() {
           </div>
 
           {/* Auth actions */}
-          <div className="relative flex flex-col gap-2 mb-8">
-            <AuthLandingGuide />
+          <div className="flex flex-col gap-2 mb-8">
             <Link href="/auth/signin">
-              <Button variant="solid" size="lg" className="w-full h-11">
-                Sign In
-              </Button>
+              <Button variant="solid" size="lg" className="w-full h-11">Sign In</Button>
             </Link>
             <Link href="/auth/signup">
-              <Button variant="default" size="lg" className="w-full h-11">
-                Create Account
-              </Button>
+              <Button variant="default" size="lg" className="w-full h-11">Create Account</Button>
             </Link>
           </div>
 
@@ -73,7 +75,7 @@ export default function AuthLandingPage() {
           </div>
 
           {/* Google SSO */}
-          <Button variant="outline" size="lg" className="w-full h-11 mb-10 gap-2.5">
+          <Button variant="outline" size="lg" className="w-full h-11 mb-10 gap-2.5" onClick={handleGoogleSignIn}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M15.68 8.18c0-.57-.05-1.11-.14-1.64H8v3.1h4.3a3.68 3.68 0 01-1.6 2.42v2h2.58c1.51-1.39 2.4-3.44 2.4-5.88z" fill="hsl(240 4% 65%)"/>
               <path d="M8 16c2.16 0 3.97-.72 5.3-1.94l-2.59-2a4.8 4.8 0 01-7.17-2.52H.94v2.07A8 8 0 008 16z" fill="hsl(240 4% 55%)"/>
@@ -85,25 +87,17 @@ export default function AuthLandingPage() {
 
           {/* Footer */}
           <div className="flex items-center gap-4 pt-6 border-t border-border">
-            <Link href="#" className="text-label-sm text-foreground-dim hover:text-foreground-muted transition-colors">
-              Privacy Policy
-            </Link>
+            <Link href="/privacy" className="text-label-sm text-foreground-dim hover:text-foreground-muted transition-colors">Privacy Policy</Link>
             <span className="text-foreground-dim text-[10px]">·</span>
-            <Link href="#" className="text-label-sm text-foreground-dim hover:text-foreground-muted transition-colors">
-              Terms of Service
-            </Link>
+            <Link href="/terms" className="text-label-sm text-foreground-dim hover:text-foreground-muted transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>
 
-      {/* Bottom annotation */}
+      {/* Bottom */}
       <div className="relative z-10 flex items-center justify-between px-4 sm:px-8 h-10 border-t border-border shrink-0">
-        <span className="font-mono text-[9px] text-foreground-dim tracking-[0.08em]">
-          VEPARTMENT OS v1.0.0
-        </span>
-        <span className="font-mono text-[9px] text-foreground-dim tracking-[0.08em]">
-          ENTERPRISE EDITION
-        </span>
+        <span className="font-mono text-[9px] text-foreground-dim tracking-[0.08em]">VEPARTMENT OS v1.0.0</span>
+        <span className="font-mono text-[9px] text-foreground-dim tracking-[0.08em]">ENTERPRISE EDITION</span>
       </div>
     </div>
   );

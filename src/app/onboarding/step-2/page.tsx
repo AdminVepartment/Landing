@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ import {
   IconHRTalent,
   IconArrowRight,
   IconCheck,
+  IconSend,
+  IconLoader,
+  IconBot,
+  IconUser,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -126,6 +130,22 @@ const DEPARTMENTS: DeptDef[] = [
   },
 ];
 
+// ── Chat types ────────────────────────────────────────────────────────────
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  isStreaming?: boolean;
+}
+
+const N8N_WEBHOOK_URL =
+  "https://vepartment.app.n8n.cloud/webhook/50cd53b3-e5dc-40a6-a5c4-e6bde8c0ebab/chat";
+
+function generateSessionId(): string {
+  return crypto.randomUUID();
+}
+
 // ── Phase: departments → domains → launch ─────────────────────────────────
 
 type Phase = "departments" | "domains";
@@ -138,6 +158,13 @@ export default function OnboardingStep2() {
   const [chatInput, setChatInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [sessionId] = useState(() => generateSessionId());
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   function toggleDept(slug: string) {
     setSelectedDepts((prev) => {
@@ -163,10 +190,20 @@ export default function OnboardingStep2() {
     });
   }
 
-  function handleChatSubmit() {
-    if (!chatInput.trim()) return;
-    // Auto-select departments based on keywords
-    const lower = chatInput.toLowerCase();
+  // Scroll chat to bottom
+  const scrollToBottom = useCallback(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Auto-select departments from AI response or user input
+  function autoSelectDepartments(text: string) {
+    const lower = text.toLowerCase();
     const autoSelect: string[] = [];
     if (lower.includes("brand")) autoSelect.push("branding");
     if (lower.includes("market") || lower.includes("campaign") || lower.includes("content")) autoSelect.push("marketing");
@@ -183,7 +220,150 @@ export default function OnboardingStep2() {
         setSelectedDomains((d) => ({ ...d, [slug]: d[slug] || [] }));
       });
     }
+  }
+
+  async function handleChatSubmit() {
+    const input = chatInput.trim();
+    if (!input || isStreaming) return;
+
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: input,
+    };
+
+    // Auto-select from user input
+    autoSelectDepartments(input);
+
+    const assistantMsgId = crypto.randomUUID();
+    const assistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: "assistant",
+      content: "",
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setChatInput("");
+    setIsStreaming(true);
+
+    try {
+      const response = await fetch(N8N_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          chatInput: input,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to connect to AI assistant");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep incomplete last line in buffer
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          try {
+            const parsed = JSON.parse(trimmed) as {
+              type?: string;
+              content?: string;
+              output?: string;
+            };
+
+            if (parsed.type === "item" && parsed.content) {
+              fullContent += parsed.content;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId
+                    ? { ...m, content: fullContent }
+                    : m
+                )
+              );
+            } else if (parsed.output) {
+              // Some n8n webhooks return a single JSON with output
+              fullContent += parsed.output;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId
+                    ? { ...m, content: fullContent }
+                    : m
+                )
+              );
+            }
+          } catch {
+            // If it's not JSON, treat as raw text token
+            if (trimmed && trimmed !== "[DONE]") {
+              fullContent += trimmed;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId
+                    ? { ...m, content: fullContent }
+                    : m
+                )
+              );
+            }
+          }
+        }
+      }
+
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        try {
+          const parsed = JSON.parse(buffer.trim()) as {
+            type?: string;
+            content?: string;
+            output?: string;
+          };
+          if (parsed.type === "item" && parsed.content) {
+            fullContent += parsed.content;
+          } else if (parsed.output) {
+            fullContent += parsed.output;
+          }
+        } catch {
+          if (buffer.trim() && buffer.trim() !== "[DONE]") {
+            fullContent += buffer.trim();
+          }
+        }
+      }
+
+      // Auto-select departments from AI response
+      autoSelectDepartments(fullContent);
+
+      // Finalize message
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMsgId
+            ? { ...m, content: fullContent || "I can help you choose departments. Tell me about your business needs.", isStreaming: false }
+            : m
+        )
+      );
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMsgId
+            ? { ...m, content: "Connection error. Please try again.", isStreaming: false }
+            : m
+        )
+      );
+    } finally {
+      setIsStreaming(false);
+    }
   }
 
   function handleContinueToDomains() {
@@ -292,24 +472,114 @@ export default function OnboardingStep2() {
                 </p>
               </div>
 
-              {/* Chat bar */}
-              <div className="flex border border-border bg-surface focus-within:border-primary/60 transition-colors mb-8">
-                <span className="pl-4 pr-2 flex items-center text-primary font-mono text-sm select-none">&gt;</span>
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleChatSubmit(); } }}
-                  placeholder="e.g. I need branding and marketing for my fashion brand..."
-                  className="flex-1 h-12 bg-transparent text-sm text-foreground font-mono placeholder:text-foreground-dim focus:outline-none pr-4"
-                />
-                <button
-                  onClick={handleChatSubmit}
-                  disabled={!chatInput.trim()}
-                  className="w-12 h-12 flex items-center justify-center border-l border-border text-foreground-dim hover:text-primary transition-colors disabled:opacity-40"
+              {/* Chat conversation */}
+              <div className="border border-border bg-surface mb-8">
+                {/* Chat header */}
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
+                  <IconBot size={14} className="text-primary" />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground-muted">
+                    Department Advisor
+                  </span>
+                  {isStreaming && (
+                    <span className="ml-auto flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-primary animate-pulse" />
+                      <span className="font-mono text-[9px] text-primary tracking-[0.08em]">STREAMING</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Chat messages area */}
+                <div
+                  ref={chatContainerRef}
+                  className="max-h-[280px] overflow-y-auto px-4 py-3 flex flex-col gap-3"
                 >
-                  <IconArrowRight size={16} />
-                </button>
+                  {messages.length === 0 && (
+                    <div className="text-center py-6">
+                      <p className="text-xs text-foreground-dim font-mono">
+                        Describe your business needs and I will recommend departments.
+                      </p>
+                    </div>
+                  )}
+
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex gap-2.5 max-w-[90%]",
+                        msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+                      )}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className={cn(
+                          "w-6 h-6 shrink-0 flex items-center justify-center border",
+                          msg.role === "user"
+                            ? "border-border bg-surface-raised"
+                            : "border-primary/40 bg-primary/10"
+                        )}
+                      >
+                        {msg.role === "user" ? (
+                          <IconUser size={12} className="text-foreground-muted" />
+                        ) : (
+                          <IconBot size={12} className="text-primary" />
+                        )}
+                      </div>
+
+                      {/* Bubble */}
+                      <div
+                        className={cn(
+                          "px-3 py-2 text-sm leading-relaxed border",
+                          msg.role === "user"
+                            ? "bg-surface-raised border-border text-foreground"
+                            : "bg-surface border-border-subtle text-foreground-muted"
+                        )}
+                      >
+                        {msg.content}
+                        {msg.isStreaming && !msg.content && (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-1 h-1 bg-primary animate-pulse" />
+                            <span className="w-1 h-1 bg-primary animate-pulse [animation-delay:150ms]" />
+                            <span className="w-1 h-1 bg-primary animate-pulse [animation-delay:300ms]" />
+                          </span>
+                        )}
+                        {msg.isStreaming && msg.content && (
+                          <span className="inline-block w-[2px] h-3.5 bg-primary animate-pulse ml-0.5 align-text-bottom" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Chat input */}
+                <div className="flex border-t border-border">
+                  <span className="pl-4 pr-2 flex items-center text-primary font-mono text-sm select-none">&gt;</span>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleChatSubmit();
+                      }
+                    }}
+                    placeholder="e.g. I need branding and marketing for my fashion brand..."
+                    disabled={isStreaming}
+                    className="flex-1 h-11 bg-transparent text-sm text-foreground font-mono placeholder:text-foreground-dim focus:outline-none pr-4 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={handleChatSubmit}
+                    disabled={!chatInput.trim() || isStreaming}
+                    className="w-11 h-11 flex items-center justify-center border-l border-border text-foreground-dim hover:text-primary transition-colors disabled:opacity-40"
+                  >
+                    {isStreaming ? (
+                      <IconLoader size={14} className="animate-spin" />
+                    ) : (
+                      <IconSend size={14} />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {error && (

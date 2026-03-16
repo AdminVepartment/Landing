@@ -224,7 +224,7 @@ export default function OnboardingStep2() {
         status: "active",
       });
 
-      router.push("/dashboard");
+      router.push("/onboarding/welcome");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
